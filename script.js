@@ -7,6 +7,12 @@ const fileInput = document.getElementById("fileInput");
 const feedbackContainer = document.getElementById("feedbackContainer");
 const groupsContainer = document.getElementById("groupsContainer");
 const completedList = document.getElementById("completedList");
+const compressPdfBtn = document.getElementById("compressPdfBtn");
+const compressModal = document.getElementById("compressModal");
+const closeCompressModal = document.getElementById("closeCompressModal");
+const confirmCompressBtn = document.getElementById("confirmCompressBtn");
+const compressFileInput = document.getElementById("compressFileInput");
+const maxSizeInput = document.getElementById("maxSizeInput");
 
 // Variável isFolderMode (pode ser removida se não for utilizada)
 let isFolderMode = true;
@@ -21,6 +27,32 @@ selectFilesBtn.addEventListener("click", () => {
 
 // Ao selecionar arquivos, processa a seleção
 fileInput.addEventListener("change", handleFileSelection);
+
+// Eventos do modal de diminuição de PDF
+compressPdfBtn.addEventListener("click", () => {
+  compressModal.style.display = "block";
+});
+
+closeCompressModal.addEventListener("click", () => {
+  compressModal.style.display = "none";
+});
+
+window.addEventListener("click", (e) => {
+  if (e.target === compressModal) {
+    compressModal.style.display = "none";
+  }
+});
+
+confirmCompressBtn.addEventListener("click", async () => {
+  const file = compressFileInput.files[0];
+  const maxSize = parseFloat(maxSizeInput.value);
+  if (!file || isNaN(maxSize) || maxSize <= 0) {
+    showFeedback("Selecione um arquivo PDF e informe o tamanho máximo.", "error");
+    return;
+  }
+  compressModal.style.display = "none";
+  await splitPdfBySize(file, maxSize);
+});
 
 function handleFileSelection() {
   clearFeedback();
@@ -274,6 +306,63 @@ async function previewMergedPDF() {
     showFeedback("Pré-visualização atualizada com sucesso!", "success");
   } catch (err) {
     showFeedback("Erro ao gerar pré-visualização.", "error");
+    console.error(err);
+  }
+}
+
+// Função para dividir PDF em partes com tamanho máximo
+async function splitPdfBySize(file, maxSizeMB) {
+  try {
+    const maxBytes = maxSizeMB * 1024 * 1024;
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+    const totalPages = pdf.getPageCount();
+    const baseName = file.name.replace(/\.pdf$/i, "");
+    const zip = new JSZip();
+    let part = 1;
+    let currentPdf = await PDFLib.PDFDocument.create();
+
+    for (let i = 0; i < totalPages; i++) {
+      const [copiedPage] = await currentPdf.copyPages(pdf, [i]);
+      currentPdf.addPage(copiedPage);
+      const currentBytes = await currentPdf.save();
+
+      if (currentBytes > maxBytes) {
+        currentPdf.removePage(currentPdf.getPageCount() - 1);
+        if (currentPdf.getPageCount() > 0) {
+          const chunkBytes = await currentPdf.save();
+          zip.file(`${baseName}-parte${part}.pdf`, chunkBytes);
+          part++;
+        }
+
+        const newDoc = await PDFLib.PDFDocument.create();
+        const [singlePage] = await newDoc.copyPages(pdf, [i]);
+        newDoc.addPage(singlePage);
+        const singleBytes = await newDoc.save();
+        if (singleBytes > maxBytes) {
+          showFeedback(`A página ${i + 1} excede o limite de ${maxSizeMB} MB.`, "error");
+          return;
+        }
+        currentPdf = newDoc;
+      }
+    }
+
+    if (currentPdf.getPageCount() > 0) {
+      const bytes = await currentPdf.save();
+      zip.file(`${baseName}-parte${part}.pdf`, bytes);
+    }
+
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(zipBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${baseName}_dividido.zip`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    showFeedback("PDF dividido com sucesso! Download iniciado.", "success");
+  } catch (err) {
+    showFeedback("Erro ao dividir o PDF.", "error");
     console.error(err);
   }
 }
