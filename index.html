@@ -15,9 +15,11 @@
       </div>
 
       <!-- Botão para selecionar os arquivos -->
-      <button id="selectFilesBtn">Carregar Arquivos</button>
-      <!-- Input oculto para seleção de múltiplos arquivos -->
-      <input type="file" id="fileInput" multiple accept=".pdf, .png, .jpg, .jpeg" style="display: none;" />
+        <button id="selectFilesBtn">Carregar Arquivos</button>
+        <!-- Input oculto para seleção de múltiplos arquivos -->
+        <input type="file" id="fileInput" multiple accept=".pdf, .png, .jpg, .jpeg" style="display: none;" />
+        <!-- Botão para diminuir PDFs -->
+        <button id="compressPdfBtn">Diminuir PDF</button>
 
       <!-- Container para exibir mensagens de feedback -->
       <div id="feedbackContainer"></div>
@@ -37,6 +39,17 @@
       </div>
     </div>
 
+    <!-- Modal para diminuir PDF -->
+    <div id="compressModal" class="modal">
+      <div class="modal-content">
+        <span id="closeCompressModal" class="close">&times;</span>
+        <h2>Diminuir PDF</h2>
+        <input type="file" id="compressFileInput" accept=".pdf" />
+        <input type="number" id="maxSizeInput" placeholder="Tamanho máximo (MB)" />
+        <button id="confirmCompressBtn">Confirmar</button>
+      </div>
+    </div>
+
     <!-- Rodapé da página -->
     <div class="footer">
       Gerencia de TI do Hospital Português. Versão 3.1
@@ -44,6 +57,7 @@
 
     <!-- Inclusão das bibliotecas necessárias -->
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="script.js"></script>
   </body>
