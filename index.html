@@ -1,64 +1,72 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mesclar e Reorganizar PDFs</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <div class="container">
-      <!-- Área de cabeçalho com logo e título -->
-      <div class="logo-container">
-        <img src="HP_novologo.gif" alt="Logo do Hospital Português" class="logo" />
-        <h1>Mesclar Arquivos PDF</h1>
-      </div>
-
-      <!-- Botão para selecionar os arquivos -->
-        <button id="selectFilesBtn">Carregar Arquivos</button>
-        <!-- Input oculto para seleção de múltiplos arquivos -->
-        <input type="file" id="fileInput" multiple accept=".pdf, .png, .jpg, .jpeg" style="display: none;" />
-        <!-- Botão para diminuir PDFs -->
-        <button id="compressPdfBtn">Diminuir PDF</button>
-
-      <!-- Container para exibir mensagens de feedback -->
-      <div id="feedbackContainer"></div>
-
-      <!-- Container para listar e ordenar os arquivos selecionados -->
-      <div id="groupsContainer"></div>
-
-      <!-- Seção para exibir a lista de PDFs mesclados concluídos -->
-      <div class="completed-section">
-        <ul id="completedList" class="completed-list"></ul>
-      </div>
-
-      <!-- Área para pré-visualização do PDF mesclado -->
-      <div id="previewContainer">
-        <h2>Pré-visualização do PDF Mesclado</h2>
-        <iframe id="pdfPreview" width="100%" height="600px"></iframe>
-      </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mesclar e Reorganizar PDFs</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- Área de cabeçalho com logo e título -->
+    <div class="logo-container">
+      <img src="HP_novologo.gif" alt="Logo do Hospital Português" class="logo" />
+      <h1>Mesclar Arquivos PDF</h1>
     </div>
-
-    <!-- Modal para diminuir PDF -->
-    <div id="compressModal" class="modal">
-      <div class="modal-content">
-        <span id="closeCompressModal" class="close">&times;</span>
-        <h2>Diminuir PDF</h2>
-        <input type="file" id="compressFileInput" accept=".pdf" />
-        <input type="number" id="maxSizeInput" placeholder="Tamanho máximo (MB)" />
-        <button id="confirmCompressBtn">Confirmar</button>
-      </div>
+    
+    <!-- Botões de ação -->
+    <div class="action-buttons">
+      <button id="selectFilesBtn">Carregar Arquivos</button>
+      <!-- Input oculto para seleção de múltiplos arquivos -->
+      <input type="file" id="fileInput" multiple accept=".pdf, .png, .jpg, .jpeg" style="display: none;" />
+      <!-- Botão para diminuir PDFs -->
+      <button id="compressPdfBtn">Diminuir PDF</button>
     </div>
-
-    <!-- Rodapé da página -->
-    <div class="footer">
-      Gerencia de TI do Hospital Português. Versão 3.1
+    
+    <!-- Container para exibir mensagens de feedback -->
+    <div id="feedbackContainer"></div>
+    
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+      <div class="spinner"></div>
+      <p>Processando arquivos, aguarde...</p>
     </div>
-
-    <!-- Inclusão das bibliotecas necessárias -->
-    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-    <script src="script.js"></script>
-  </body>
+    
+    <!-- Container para listar e ordenar os arquivos selecionados -->
+    <div id="groupsContainer"></div>
+    
+    <!-- Seção para exibir a lista de PDFs mesclados concluídos -->
+    <div class="completed-section">
+      <ul id="completedList" class="completed-list"></ul>
+    </div>
+    
+    <!-- Área para pré-visualização do PDF mesclado -->
+    <div id="previewContainer">
+      <h2>Pré-visualização do PDF Mesclado</h2>
+      <iframe id="pdfPreview" width="100%" height="600px"></iframe>
+    </div>
+  </div>
+  
+  <!-- Modal para diminuir PDF -->
+  <div id="compressModal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="closeCompressModal">×</span>
+      <h2>Diminuir PDF</h2>
+      <input type="file" id="compressFileInput" accept=".pdf" />
+      <input type="number" id="maxSizeInput" placeholder="Tamanho máximo (MB)" />
+      <button id="confirmCompressBtn">Confirmar</button>
+    </div>
+  </div>
+  
+  <!-- Rodapé da página -->
+  <div class="footer">
+    Gerencia de TI do Hospital Português. Versão 3.2
+  </div>
+  
+  <!-- Inclusão das bibliotecas necessárias -->
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script src="script.js"></script>
+</body>
 </html>
