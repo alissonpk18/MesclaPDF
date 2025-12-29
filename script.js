@@ -1,5 +1,5 @@
-// A pré-visualização é atualizada automaticamente a cada alteração na lista de arquivos,
-// não sendo necessário (nem exibido) um botão específico para esta função.
+// MesclarPDF v3.2 - Hospital Português
+// A pré-visualização é atualizada automaticamente a cada alteração na lista de arquivos.
 
 // Seleção dos elementos da interface
 const selectFilesBtn = document.getElementById("selectFilesBtn");
@@ -7,52 +7,22 @@ const fileInput = document.getElementById("fileInput");
 const feedbackContainer = document.getElementById("feedbackContainer");
 const groupsContainer = document.getElementById("groupsContainer");
 const completedList = document.getElementById("completedList");
-const compressPdfBtn = document.getElementById("compressPdfBtn");
-const compressModal = document.getElementById("compressModal");
-const closeCompressModal = document.getElementById("closeCompressModal");
-const confirmCompressBtn = document.getElementById("confirmCompressBtn");
-const compressFileInput = document.getElementById("compressFileInput");
-const maxSizeInput = document.getElementById("maxSizeInput");
 
-// Variável isFolderMode (pode ser removida se não for utilizada)
-let isFolderMode = true;
-let allFiles = []; // Array para armazenar os arquivos selecionados (objeto: { file, name })
+// Array para armazenar os arquivos selecionados (objeto: { file, name })
+let allFiles = [];
+
+// Variável para armazenar URLs de blob e liberar memória
+let currentPreviewUrl = null;
+let currentDownloadUrl = null;
 
 // Evento para disparar a seleção de arquivos
 selectFilesBtn.addEventListener("click", () => {
-  isFolderMode = false;
   fileInput.removeAttribute("webkitdirectory");
   fileInput.click();
 });
 
 // Ao selecionar arquivos, processa a seleção
 fileInput.addEventListener("change", handleFileSelection);
-
-// Eventos do modal de diminuição de PDF
-compressPdfBtn.addEventListener("click", () => {
-  compressModal.style.display = "block";
-});
-
-closeCompressModal.addEventListener("click", () => {
-  compressModal.style.display = "none";
-});
-
-window.addEventListener("click", (e) => {
-  if (e.target === compressModal) {
-    compressModal.style.display = "none";
-  }
-});
-
-confirmCompressBtn.addEventListener("click", async () => {
-  const file = compressFileInput.files[0];
-  const maxSize = parseFloat(maxSizeInput.value);
-  if (!file || isNaN(maxSize) || maxSize <= 0) {
-    showFeedback("Selecione um arquivo PDF e informe o tamanho máximo.", "error");
-    return;
-  }
-  compressModal.style.display = "none";
-  await splitPdfBySize(file, maxSize);
-});
 
 function handleFileSelection() {
   clearFeedback();
@@ -101,7 +71,7 @@ function renderGroups() {
     groupContainer.classList.add("group-container");
 
     const title = document.createElement("h2");
-    title.textContent = "Arquivos Selecionados";
+    title.innerHTML = '<i class="bi bi-files me-2"></i>Arquivos Selecionados';
     groupContainer.appendChild(title);
 
     const list = document.createElement("ul");
@@ -111,6 +81,7 @@ function renderGroups() {
     // Ativa a ordenação com SortableJS
     Sortable.create(list, {
       animation: 150,
+      ghostClass: 'sortable-ghost',
       onUpdate: function () {
         const items = Array.from(list.children);
         const newOrderFiles = items.map((item) => {
@@ -124,7 +95,8 @@ function renderGroups() {
 
     // Botão para mesclar os PDFs do grupo
     const mergeButton = document.createElement("button");
-    mergeButton.textContent = "Mesclar PDFs";
+    mergeButton.classList.add("btn", "btn-success", "btn-lg", "rounded-pill", "mt-3");
+    mergeButton.innerHTML = '<i class="bi bi-file-earmark-pdf me-2"></i>Mesclar PDFs';
     mergeButton.addEventListener("click", () => mergeGroup(groupContainer, list));
     groupContainer.appendChild(mergeButton);
 
@@ -139,16 +111,23 @@ function renderGroups() {
 // Função para atualizar a lista de arquivos exibida e atualizar a pré-visualização
 function updateFileList(list) {
   list.innerHTML = "";
-  allFiles.forEach((f) => {
+  allFiles.forEach((f, index) => {
     const li = document.createElement("li");
-    li.textContent = f.name;
+
+    // Ícone baseado no tipo de arquivo
+    const ext = f.name.toLowerCase();
+    let icon = "bi-file-earmark";
+    if (ext.endsWith(".pdf")) icon = "bi-file-earmark-pdf";
+    else if (ext.endsWith(".png") || ext.endsWith(".jpg") || ext.endsWith(".jpeg")) icon = "bi-file-earmark-image";
+
+    li.innerHTML = `<span><i class="bi ${icon} me-2"></i><strong>${index + 1}.</strong> ${f.name}</span>`;
     // Usamos data-filename para identificar unicamente o item
     li.setAttribute("data-filename", f.name);
 
     // Botão para remover o arquivo da lista
     const removeButton = document.createElement("button");
     removeButton.classList.add("remove-btn");
-    removeButton.textContent = "Remover";
+    removeButton.innerHTML = '<i class="bi bi-trash me-1"></i>Remover';
     removeButton.addEventListener("click", () => {
       const indexToRemove = allFiles.findIndex((file) => file.name === f.name);
       if (indexToRemove !== -1) {
@@ -170,6 +149,48 @@ function updateFileList(list) {
   previewMergedPDF();
 }
 
+// Função auxiliar para processar arquivos e criar PDF mesclado
+async function processFilesToPDF(files) {
+  const mergedPdf = await PDFLib.PDFDocument.create();
+
+  for (const fileObj of files) {
+    const arrayBuffer = await fileObj.file.arrayBuffer();
+    const fileType = fileObj.file.type;
+
+    if (fileType === "application/pdf") {
+      // Se for PDF, copia as páginas normalmente
+      try {
+        // CORREÇÃO: ignoreEncryption permite carregar PDFs com Owner Password
+        // (criptografia de metadados sem senha de abertura)
+        const pdf = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+        copiedPages.forEach((page) => mergedPdf.addPage(page));
+      } catch (err) {
+        // Tratamento específico para PDFs com User Password (senha de abertura obrigatória)
+        if (err.message && err.message.includes('encrypted')) {
+          throw new Error(`O PDF "${fileObj.name}" exige uma senha de abertura. Remova a senha antes de mesclar.`);
+        }
+        throw new Error(`Falha ao ler o PDF "${fileObj.name}". Detalhes: ${err.message}`);
+      }
+    } else if (fileType === "image/png" || fileType === "image/jpeg") {
+      // Se for imagem, converte para uma página do PDF
+      const image = fileType === "image/png"
+        ? await mergedPdf.embedPng(arrayBuffer)
+        : await mergedPdf.embedJpg(arrayBuffer);
+
+      const page = mergedPdf.addPage([image.width, image.height]);
+      page.drawImage(image, {
+        x: 0,
+        y: 0,
+        width: image.width,
+        height: image.height
+      });
+    }
+  }
+
+  return mergedPdf;
+}
+
 // Função para mesclar os PDFs do grupo e gerar o link para download
 async function mergeGroup(groupContainer, list) {
   if (allFiles.length === 0) {
@@ -177,75 +198,59 @@ async function mergeGroup(groupContainer, list) {
     return;
   }
 
-  const mergedPdf = await PDFLib.PDFDocument.create();
+  try {
+    const mergedPdf = await processFilesToPDF(allFiles);
 
-  for (const fileObj of allFiles) {
-    try {
-      const arrayBuffer = await fileObj.file.arrayBuffer();
-      const fileType = fileObj.file.type;
+    // Salva o PDF final e cria um Blob com os bytes gerados
+    const mergedPdfBytes = await mergedPdf.save();
+    const blob = new Blob([mergedPdfBytes], { type: "application/pdf" });
 
-      if (fileType === "application/pdf") {
-        // Se for PDF, copia as páginas normalmente
-        const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
-        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-        copiedPages.forEach((page) => mergedPdf.addPage(page));
-      } else if (fileType === "image/png" || fileType === "image/jpeg") {
-        // Se for imagem, converte para uma página do PDF
-        const image = fileType === "image/png" 
-          ? await mergedPdf.embedPng(arrayBuffer)
-          : await mergedPdf.embedJpg(arrayBuffer);
-
-        const page = mergedPdf.addPage([image.width, image.height]);
-        page.drawImage(image, {
-          x: 0,
-          y: 0,
-          width: image.width,
-          height: image.height
-        });
-      } else {
-        showFeedback(`Formato inválido: ${fileObj.name}`, "error");
-        return;
-      }
-    } catch (err) {
-      showFeedback(`Erro ao processar o arquivo ${fileObj.name}.`, "error");
-      console.error(err);
-      return;
+    // Libera URL anterior para evitar memory leak
+    if (currentDownloadUrl) {
+      URL.revokeObjectURL(currentDownloadUrl);
     }
+
+    const url = URL.createObjectURL(blob);
+    currentDownloadUrl = url;
+
+    // Verifica se já existe um botão de download e, se sim, atualiza-o
+    let downloadBtn = groupContainer.querySelector(".download-btn");
+    if (downloadBtn) {
+      // Atualiza o link para o novo PDF mesclado
+      downloadBtn.href = url;
+    } else {
+      // Caso não exista, cria o botão de download
+      downloadBtn = document.createElement("a");
+      downloadBtn.href = url;
+      downloadBtn.download = "mesclado.pdf";
+      downloadBtn.innerHTML = '<i class="bi bi-download me-2"></i>Baixar PDF Combinado';
+      downloadBtn.classList.add("download-btn", "btn", "btn-success", "btn-lg", "rounded-pill", "ms-2");
+      downloadBtn.addEventListener("click", () => {
+        const completedItem = document.createElement("li");
+        completedItem.classList.add("list-group-item");
+        completedItem.innerHTML = `<i class="bi bi-check-circle me-2"></i>PDF mesclado criado em ${new Date().toLocaleString()}`;
+        completedList.appendChild(completedItem);
+        groupContainer.remove();
+        allFiles = []; // Limpa a lista após a mesclagem
+
+        // Limpa também a pré-visualização e libera memória
+        const pdfPreview = document.getElementById("pdfPreview");
+        if (pdfPreview) {
+          pdfPreview.src = "";
+        }
+        if (currentPreviewUrl) {
+          URL.revokeObjectURL(currentPreviewUrl);
+          currentPreviewUrl = null;
+        }
+      });
+      groupContainer.appendChild(downloadBtn);
+    }
+
+    showFeedback("Os PDFs e imagens foram combinados com sucesso!", "success");
+  } catch (err) {
+    showFeedback(`Erro ao processar os arquivos.`, "error");
+    console.error(err);
   }
-
-  // Salva o PDF final e cria um Blob com os bytes gerados
-  const mergedPdfBytes = await mergedPdf.save();
-  const blob = new Blob([mergedPdfBytes], { type: "application/pdf" });
-  const url = URL.createObjectURL(blob);
-
-  // Verifica se já existe um botão de download e, se sim, atualiza-o
-  let downloadBtn = groupContainer.querySelector(".download-btn");
-  if (downloadBtn) {
-    // Atualiza o link para o novo PDF mesclado
-    downloadBtn.href = url;
-  } else {
-    // Caso não exista, cria o botão de download
-    downloadBtn = document.createElement("a");
-    downloadBtn.href = url;
-    downloadBtn.download = "mesclado.pdf";
-    downloadBtn.textContent = "Baixar PDF Combinado";
-    downloadBtn.classList.add("download-btn");
-    downloadBtn.addEventListener("click", () => {
-      const completedItem = document.createElement("li");
-      completedItem.textContent = `PDF mesclado criado em ${new Date().toLocaleString()}`;
-      completedList.appendChild(completedItem);
-      groupContainer.remove();
-      allFiles = []; // Limpa a lista após a mesclagem
-      // Limpa também a pré-visualização
-      const pdfPreview = document.getElementById("pdfPreview");
-      if (pdfPreview) {
-        pdfPreview.src = "";
-      }
-    });
-    groupContainer.appendChild(downloadBtn);
-  }
-
-  showFeedback("Os PDFs e imagens foram combinados com sucesso!", "success");
 }
 
 // Função para pré-visualizar o PDF mesclado (é chamada automaticamente em caso de alteração)
@@ -257,46 +262,28 @@ async function previewMergedPDF() {
     if (pdfPreview) {
       pdfPreview.src = "";
     }
+    // Libera URL anterior
+    if (currentPreviewUrl) {
+      URL.revokeObjectURL(currentPreviewUrl);
+      currentPreviewUrl = null;
+    }
     return;
   }
 
   try {
-    // Cria um novo documento PDF para a mesclagem
-    const mergedPdf = await PDFLib.PDFDocument.create();
-
-    // Itera sobre os arquivos selecionados e os mescla
-    for (const fileObj of allFiles) {
-      const arrayBuffer = await fileObj.file.arrayBuffer();
-      const fileType = fileObj.file.type;
-
-      if (fileType === "application/pdf") {
-        // Carrega o PDF e copia suas páginas
-        const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
-        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-        copiedPages.forEach((page) => mergedPdf.addPage(page));
-      } else if (fileType === "image/png" || fileType === "image/jpeg") {
-        // Incorpora a imagem e cria uma página para exibi-la
-        const image = fileType === "image/png" 
-          ? await mergedPdf.embedPng(arrayBuffer)
-          : await mergedPdf.embedJpg(arrayBuffer);
-
-        const page = mergedPdf.addPage([image.width, image.height]);
-        page.drawImage(image, {
-          x: 0,
-          y: 0,
-          width: image.width,
-          height: image.height
-        });
-      } else {
-        showFeedback(`Formato inválido: ${fileObj.name}`, "error");
-        return;
-      }
-    }
+    const mergedPdf = await processFilesToPDF(allFiles);
 
     // Gera os bytes do PDF mesclado e cria um Blob
     const mergedPdfBytes = await mergedPdf.save();
     const blob = new Blob([mergedPdfBytes], { type: "application/pdf" });
+
+    // Libera URL anterior para evitar memory leak
+    if (currentPreviewUrl) {
+      URL.revokeObjectURL(currentPreviewUrl);
+    }
+
     const url = URL.createObjectURL(blob);
+    currentPreviewUrl = url;
 
     // Atualiza a pré-visualização no elemento <iframe id="pdfPreview">
     if (pdfPreview) {
@@ -310,69 +297,18 @@ async function previewMergedPDF() {
   }
 }
 
-// Função para dividir PDF em partes com tamanho máximo
-async function splitPdfBySize(file, maxSizeMB) {
-  try {
-    const maxBytes = maxSizeMB * 1024 * 1024;
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
-    const totalPages = pdf.getPageCount();
-    const baseName = file.name.replace(/\.pdf$/i, "");
-    const zip = new JSZip();
-    let part = 1;
-    let currentPdf = await PDFLib.PDFDocument.create();
-
-    for (let i = 0; i < totalPages; i++) {
-      const [copiedPage] = await currentPdf.copyPages(pdf, [i]);
-      currentPdf.addPage(copiedPage);
-      const currentBytes = await currentPdf.save();
-
-      if (currentBytes > maxBytes) {
-        currentPdf.removePage(currentPdf.getPageCount() - 1);
-        if (currentPdf.getPageCount() > 0) {
-          const chunkBytes = await currentPdf.save();
-          zip.file(`${baseName}-parte${part}.pdf`, chunkBytes);
-          part++;
-        }
-
-        const newDoc = await PDFLib.PDFDocument.create();
-        const [singlePage] = await newDoc.copyPages(pdf, [i]);
-        newDoc.addPage(singlePage);
-        const singleBytes = await newDoc.save();
-        if (singleBytes > maxBytes) {
-          showFeedback(`A página ${i + 1} excede o limite de ${maxSizeMB} MB.`, "error");
-          return;
-        }
-        currentPdf = newDoc;
-      }
-    }
-
-    if (currentPdf.getPageCount() > 0) {
-      const bytes = await currentPdf.save();
-      zip.file(`${baseName}-parte${part}.pdf`, bytes);
-    }
-
-    const zipBlob = await zip.generateAsync({ type: "blob" });
-    const url = URL.createObjectURL(zipBlob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${baseName}_dividido.zip`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    showFeedback("PDF dividido com sucesso! Download iniciado.", "success");
-  } catch (err) {
-    showFeedback("Erro ao dividir o PDF.", "error");
-    console.error(err);
-  }
-}
-
 // Funções utilitárias para feedback
 function showFeedback(message, type = "info") {
   clearFeedback();
   const feedback = document.createElement("div");
   feedback.classList.add("feedback", type);
-  feedback.textContent = message;
+
+  // Ícone baseado no tipo
+  let icon = "bi-info-circle";
+  if (type === "success") icon = "bi-check-circle";
+  else if (type === "error") icon = "bi-exclamation-triangle";
+
+  feedback.innerHTML = `<i class="bi ${icon} me-2"></i>${message}`;
   feedbackContainer.appendChild(feedback);
 }
 

@@ -1,0 +1,58 @@
+Documentação para Manutenção do Sistema de Mesclagem de PDFs
+1. Descrição Geral
+Este sistema permite carregar arquivos PDF e imagens (PNG/JPG), mesclá-los em um único PDF e exibir uma pré-visualização antes do download.
+
+2. Estrutura do Código
+O sistema é composto por três principais arquivos:
+
+index.html → Interface principal do usuário.
+style.css → Estilização da página.
+script.js → Funcionalidade da mesclagem e manipulação dos arquivos.
+3. Funcionalidades
+3.1 Interface HTML
+#fileInput → Input oculto para seleção de arquivos.
+#selectFilesBtn → Botão para abrir o seletor de arquivos.
+#groupsContainer → Lista dos arquivos selecionados.
+#completedList → Lista de PDFs mesclados concluídos.
+#pdfPreview → Exibição do PDF mesclado.
+3.2 Estilização CSS
+Design responsivo para telas menores.
+Cores baseadas no padrão institucional do Hospital Português.
+Estilização para botões, listas e contêineres.
+3.3 Script JavaScript
+Eventos Principais
+Seleção de Arquivos
+
+Disparado ao clicar em #selectFilesBtn, abre o seletor de arquivos.
+Filtra apenas arquivos .pdf, .png, .jpg, .jpeg.
+Atualiza allFiles e exibe na interface.
+Renderização da Lista
+
+renderGroups() → Exibe os arquivos selecionados em #groupsContainer.
+updateFileList() → Atualiza a lista conforme arquivos são adicionados/removidos.
+Mesclagem de Arquivos
+
+mergeGroup() → Cria um novo PDF com os arquivos selecionados.
+Utiliza a biblioteca PDF-Lib para manipular PDFs.
+Permite inserir imagens como páginas em PDFs.
+Pré-visualização do PDF
+
+previewMergedPDF() → Exibe o PDF gerado no <iframe>.
+Feedback para o Usuário
+
+showFeedback() → Exibe mensagens de erro, sucesso ou informações.
+clearFeedback() → Limpa mensagens anteriores.
+4. Manutenção
+4.1 Possíveis Erros e Soluções
+Erro	Causa	Solução
+Arquivo não aparece na lista	Formato inválido	Verificar extensão .pdf, .png, .jpg, .jpeg
+Botão "Mesclar PDFs" não funciona	Lista vazia	Certificar-se de que há arquivos na lista
+Pré-visualização não carrega	Erro no PDF-Lib	Verificar console do navegador (F12 → Console)
+4.2 Atualizações
+Adicionar suporte a novos formatos: Modificar allowedTypes e incluir tratamento no mergeGroup().
+Otimizar desempenho: Processar grandes PDFs em lotes menores.
+5. Dependências
+PDF-Lib.js (pdf-lib.min.js) → Manipulação de PDFs.
+Sortable.js (sortable.min.js) → Ordenação dos arquivos.
+6. Considerações Finais
+O sistema é simples e modular, permitindo fácil manutenção. Para ajustes, modificar script.js e style.css. Para novas funcionalidades, verificar a documentação do PDF-Lib.
